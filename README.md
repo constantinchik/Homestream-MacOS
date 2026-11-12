@@ -1,6 +1,19 @@
-# HomeStream
+<p align="center">
+  <img src="docs/icon.png" width="128" height="128" alt="HomeStream icon">
+</p>
 
-Native macOS menu bar app that streams your screen or camera to OBS via SRT.
+<h1 align="center">HomeStream</h1>
+
+<p align="center">
+  Native macOS menu bar app that streams your Mac's screen or camera to OBS on <b>another computer on your local network</b>, over SRT.
+</p>
+
+<p align="center">
+  <img src="docs/menu.png" width="420" alt="HomeStream menu: SRT destination, display sources (As is / Streaming) and cameras">
+</p>
+
+> [!IMPORTANT]
+> **HomeStream is for local streaming only.** It sends your Mac's video to an OBS instance on your own LAN, for example a gaming/streaming PC on the same router. It does not stream to Twitch, YouTube or any internet service, and it has no accounts or cloud: OBS on the receiving machine does the broadcasting. The stream is unencrypted SRT at ~30 Mbps, so keep it on a trusted local network.
 
 Uses Apple's **AVCaptureSession** for cameras (which triggers macOS camera controls like Center Stage, Portrait Mode, and Studio Light) and **ScreenCaptureKit** for screen capture with cursor support. Frames are piped to **ffmpeg** for H.264 hardware encoding via VideoToolbox and SRT transport.
 
@@ -23,7 +36,8 @@ Uses Apple's **AVCaptureSession** for cameras (which triggers macOS camera contr
 - **`ffmpeg-full`** from Homebrew: `brew install ffmpeg-full`
   - Homebrew's plain `ffmpeg` formula dropped SRT support in 9.0, so it can't stream. HomeStream looks for `/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg` first, then falls back to `ffmpeg` on the usual paths.
   - Check SRT support: `$(brew --prefix ffmpeg-full)/bin/ffmpeg -hide_banner -protocols | grep -w srt`
-- OBS with an SRT listener on the receiving machine
+- OBS with an SRT listener on the receiving machine, on the same local network
+  - The Mac must be able to reach the OBS machine's IP directly (UDP, port 9000 by default). If they're on different subnets, for example the PC behind the ISP modem and the Mac behind your own router, the router needs a route to the other subnet.
 
 ## Install
 
@@ -80,7 +94,7 @@ Edit the notes on GitHub afterwards to add highlights and requirement changes (f
 
 1. Launch HomeStream. A video camera icon appears in the menu bar.
 2. Click the icon to see available sources.
-3. Set the SRT destination (default: `192.168.2.100:9000`).
+3. Set the SRT destination to the OBS machine's **local IP** and port (default: `192.168.2.100:9000`).
 4. Click a source to start streaming.
 5. In OBS, add a Media Source with `srt://0.0.0.0:9000?mode=listener` (or your configured port). Set its **Reconnect Delay** to 1s for fast restarts.
 
@@ -120,3 +134,9 @@ Sources/
 ```
 
 Frames flow as: Native Capture → BGRA pixel buffers → stdin pipe → ffmpeg (h264_videotoolbox) → SRT → OBS
+
+## License
+
+HomeStream is licensed under the [GNU General Public License v3.0](LICENSE).
+
+It runs Homebrew's `ffmpeg-full` as a separate process; that build is itself GPL-licensed.
