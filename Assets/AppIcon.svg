@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- HomeStream app icon: Mac laptop beaming its screen to a PC monitor.
+       macOS icon grid: 824x824 rounded tile centered in a 1024 canvas.
+       Render: make icon -->
+  <defs>
+    <clipPath id="sq"><rect x="100" y="100" width="824" height="824" rx="185"/></clipPath>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#A78BFA"/><stop offset="1" stop-color="#6D5DF6"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F3F0FF"/><stop offset="1" stop-color="#DDD6FE"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fff" stop-opacity=".15"/><stop offset="1" stop-color="#fff"/>
+    </linearGradient>
+    <radialGradient id="glow">
+      <stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000" flood-opacity=".28"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#tile)"/>
+  </g>
+
+  <g clip-path="url(#sq)">
+    <!-- laptop -->
+    <rect x="178" y="478" width="276" height="182" rx="22" fill="#fff"/>
+    <rect x="198" y="498" width="236" height="140" rx="10" fill="url(#screen)"/>
+    <path d="M150 672 h332 q-8 32 -42 32 h-248 q-34 0 -42 -32 z" fill="#fff"/>
+    <path d="M296 545 v46 q0 10 9 5 l40 -23 q8 -5 0 -10 l-40 -23 q-9 -5 -9 5 z" fill="#7C6CF7"/>
+
+    <!-- monitor -->
+    <rect x="574" y="330" width="300" height="214" rx="24" fill="#fff"/>
+    <rect x="596" y="352" width="256" height="170" rx="10" fill="url(#screen)"/>
+    <rect x="709" y="544" width="30" height="66" fill="#fff"/>
+    <rect x="660" y="604" width="128" height="26" rx="13" fill="#fff"/>
+    <path d="M704 410 v54 q0 12 11 6 l47 -27 q9 -6 0 -12 l-47 -27 q-11 -6 -11 6 z" fill="#7C6CF7"/>
+
+    <!-- beam -->
+    <path d="M330 462 C 350 340, 470 300, 560 372" fill="none" stroke="url(#beam)" stroke-width="26" stroke-linecap="round"/>
+    <circle cx="566" cy="376" r="60" fill="url(#glow)"/>
+    <circle cx="566" cy="376" r="20" fill="#fff"/>
+  </g>
+</svg>

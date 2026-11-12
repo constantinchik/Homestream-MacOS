@@ -69,6 +69,7 @@ make build      # Build release binary + app bundle in .build/HomeStream.app
 make install    # Build and replace /Applications/HomeStream.app
 make run        # Build and launch from .build
 make zip        # Build and zip the bundle to .build/HomeStream.app.zip
+make icon       # Re-render AppIcon.png/.icns + docs/icon.png from Assets/AppIcon.svg (needs Chrome)
 make clean      # Clean build artifacts
 make reset      # Reset Screen Recording + Camera permissions
 make dev        # install + reset + launch
