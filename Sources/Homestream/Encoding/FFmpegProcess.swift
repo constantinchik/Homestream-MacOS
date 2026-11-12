@@ -2,10 +2,20 @@ import CoreVideo
 import Foundation
 
 final class FFmpegProcess {
+    // Fixed output canvas. Every source is scaled to this at capture time so a
+    // single ffmpeg/SRT session survives source switches (reconnecting to the
+    // OBS listener costs several seconds).
+    static let outputWidth = 1920
+    static let outputHeight = 1080
+    static let outputFPS = 60
+
     private var process: Process?
     private var stdinPipe: Pipe?
     private var stderrPipe: Pipe?
-    private let fps: Int
+    private let fps = FFmpegProcess.outputFPS
+    private let pendingLock = NSLock()
+    private var pendingWrites = 0
+    private var loggedSizeMismatch = false
     private let host: String
     private let port: String
     private let queue = DispatchQueue(label: "homestream.ffmpeg-write", qos: .userInteractive)
@@ -21,7 +31,11 @@ final class FFmpegProcess {
     private(set) var framesWritten: UInt64 = 0
 
     private static let ffmpegPath: String = {
+        // Homebrew's plain `ffmpeg` formula dropped libsrt in 9.0; the keg-only
+        // `ffmpeg-full` still has it, so prefer that when installed.
         let candidates = [
+            "/opt/homebrew/opt/ffmpeg-full/bin/ffmpeg",
+            "/usr/local/opt/ffmpeg-full/bin/ffmpeg",
             "/opt/homebrew/bin/ffmpeg",
             "/usr/local/bin/ffmpeg",
             "/usr/bin/ffmpeg",
@@ -30,8 +44,7 @@ final class FFmpegProcess {
             ?? "/opt/homebrew/bin/ffmpeg"
     }()
 
-    init(fps: Int, host: String, port: String) {
-        self.fps = fps
+    init(host: String, port: String) {
         self.host = host
         self.port = port
     }
@@ -48,11 +61,16 @@ final class FFmpegProcess {
         proc.executableURL = URL(fileURLWithPath: Self.ffmpegPath)
         proc.arguments = [
             "-y",
+            // Timestamp frames by arrival so 30fps cameras and 60fps screens
+            // share one input; the CFR output duplicates frames to fill gaps
+            // (including the brief pause while switching sources).
+            "-use_wallclock_as_timestamps", "1",
             "-f", "rawvideo",
             "-pix_fmt", pixFmt,
             "-s", "\(width)x\(height)",
-            "-r", "\(fps)",
             "-i", "pipe:0",
+            "-fps_mode", "cfr",
+            "-r", "\(fps)",
             "-c:v", "h264_videotoolbox",
             "-b:v", "30M",
             "-realtime", "1",
@@ -115,6 +133,16 @@ final class FFmpegProcess {
         default: ffmpegFmt = "bgra"
         }
 
+        // The stream's geometry is fixed for the session; a differently sized
+        // frame would corrupt the rawvideo pipe, so drop it.
+        if bufW != Self.outputWidth || bufH != Self.outputHeight {
+            if !loggedSizeMismatch {
+                hslog("[ffmpeg] Dropping \(bufW)x\(bufH) frame (expected \(Self.outputWidth)x\(Self.outputHeight))")
+                loggedSizeMismatch = true
+            }
+            return
+        }
+
         // Lazy start ffmpeg on first frame
         if !started {
             hslog("[ffmpeg] First frame: \(bufW)x\(bufH) planes=\(planeCount) fmt=\(fourCC(fmt)) → \(ffmpegFmt)")
@@ -128,6 +156,22 @@ final class FFmpegProcess {
         }
 
         guard isWritable else { return }
+
+        // Back-pressure: if ffmpeg falls behind (or is still connecting), drop
+        // frames instead of queueing seconds of stale video.
+        pendingLock.lock()
+        if pendingWrites >= 2 {
+            pendingLock.unlock()
+            return
+        }
+        pendingWrites += 1
+        pendingLock.unlock()
+        var handedOff = false
+        defer {
+            if !handedOff {
+                pendingLock.lock(); pendingWrites -= 1; pendingLock.unlock()
+            }
+        }
 
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
@@ -189,8 +233,13 @@ final class FFmpegProcess {
             hslog("[ffmpeg] Writing first frame: \(frameData.count) bytes")
         }
 
+        handedOff = true
         queue.async { [weak self] in
-            guard let self, self.isWritable else { return }
+            guard let self else { return }
+            defer {
+                self.pendingLock.lock(); self.pendingWrites -= 1; self.pendingLock.unlock()
+            }
+            guard self.isWritable else { return }
             do {
                 try self.stdinPipe?.fileHandleForWriting.write(contentsOf: frameData)
                 self.framesWritten += 1
@@ -213,17 +262,20 @@ final class FFmpegProcess {
         try? stdinPipe?.fileHandleForWriting.close()
         stdinPipe = nil
 
-        if let proc = process, proc.isRunning {
-            // Send EOF via pipe close above, give ffmpeg time to exit, then force kill
-            DispatchQueue.global().async {
-                proc.waitUntilExit()
-            }
-            usleep(200_000)  // 200ms grace
-            if proc.isRunning {
-                proc.terminate()
-            }
-        }
+        guard let proc = process else { return }
         process = nil
+
+        // EOF (pipe closed above) lets ffmpeg flush and send an SRT shutdown,
+        // so OBS frees its listener immediately. Killing it instead leaves OBS
+        // holding a dead peer and the next caller stalls for seconds.
+        let deadline = Date().addingTimeInterval(1.0)
+        while proc.isRunning && Date() < deadline { usleep(20_000) }
+        if proc.isRunning {
+            proc.interrupt()  // SIGINT: still a graceful ffmpeg shutdown
+            let hardDeadline = Date().addingTimeInterval(0.5)
+            while proc.isRunning && Date() < hardDeadline { usleep(20_000) }
+        }
+        if proc.isRunning { proc.terminate() }
     }
 }
 

@@ -15,7 +15,7 @@ final class CameraCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         hslog("[camera] Configuring session for: \(device.localizedName)")
 
         session.beginConfiguration()
-        session.sessionPreset = .high
+        session.sessionPreset = session.canSetSessionPreset(.hd1920x1080) ? .hd1920x1080 : .high
 
         let input = try AVCaptureDeviceInput(device: device)
         guard session.canAddInput(input) else {
@@ -26,7 +26,10 @@ final class CameraCapture: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         let output = AVCaptureVideoDataOutput()
         // Use BGRA for camera too — simpler, and VideoToolbox handles conversion
         output.videoSettings = [
-            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+            // Fixed stream canvas, shared with screen capture
+            kCVPixelBufferWidthKey as String: FFmpegProcess.outputWidth,
+            kCVPixelBufferHeightKey as String: FFmpegProcess.outputHeight,
         ]
         output.alwaysDiscardsLateVideoFrames = true
         output.setSampleBufferDelegate(self, queue: queue)

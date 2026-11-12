@@ -16,13 +16,20 @@ final class ScreenCapture: NSObject, SCStreamOutput {
                                      exceptingWindows: [])
 
         let config = SCStreamConfiguration()
-        config.width = display.width
-        config.height = display.height
+        // Scale into the fixed stream canvas (letterboxed) so switching sources
+        // never changes the ffmpeg input geometry.
+        config.width = FFmpegProcess.outputWidth
+        config.height = FFmpegProcess.outputHeight
+        config.scalesToFit = true
+        if #available(macOS 14.0, *) {
+            config.preservesAspectRatio = true
+        }
+        config.backgroundColor = CGColor.black  // unowned(unsafe): must be a long-lived color
         config.minimumFrameInterval = CMTime(value: 1, timescale: 60)
         config.showsCursor = true
         config.pixelFormat = kCVPixelFormatType_32BGRA
 
-        hslog("[screen] Configuring: \(display.width)x\(display.height) BGRA 60fps")
+        hslog("[screen] Configuring: \(display.width)x\(display.height) → \(config.width)x\(config.height) BGRA 60fps")
 
         let stream = SCStream(filter: filter, configuration: config, delegate: nil)
         try stream.addStreamOutput(self, type: .screen, sampleHandlerQueue: queue)

@@ -105,6 +105,7 @@ extension CaptureSource {
     var iconName: String {
         switch self {
         case .screen: return "display"
+        case .streamerScreen: return "dot.radiowaves.left.and.right"
         case .camera: return "camera"
         }
     }
